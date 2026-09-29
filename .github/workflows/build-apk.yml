@@ -21,6 +21,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install Android SDK 35
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
@@ -32,13 +37,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Reconstruct local CSS
+      - name: Build compatibility assets
         run: |
-          mkdir -p app/src/main/assets
-          base64 -d .buildparts/tailwind.css.gz.b64 | gunzip > app/src/main/assets/tailwind.css
-          test -s app/src/main/assets/tailwind.css
+          npm install --no-save @babel/core@7 @babel/preset-env@7 tailwindcss@3.4.17
+          node scripts/build-compat.js
+          npx tailwindcss -c tailwind.config.js -i scripts/tailwind-input.css -o app/src/main/assets/tailwind.css --minify
           test -s app/src/main/assets/index.html
+          test -s app/src/main/assets/tailwind.css
           test -s app/src/main/assets/confetti-lite.js
+          if grep -q "oklch(" app/src/main/assets/tailwind.css; then
+            echo "CSS incompatível detectado" >&2
+            exit 1
+          fi
 
       - name: Build APK
         run: gradle --no-daemon assembleDebug
@@ -49,7 +59,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Trilha-Tecnologica-APK
+          name: Trilha-Tecnologica-Android-Compat
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/app-debug.apk.sha256
