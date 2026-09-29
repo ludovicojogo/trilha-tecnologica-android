@@ -50,6 +50,12 @@ jobs:
             exit 1
           fi
 
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: trilha-tecnologica-debug-signing-v1
+
       - name: Build APK
         run: gradle --no-daemon assembleDebug
 
@@ -59,7 +65,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Trilha-Tecnologica-Android-Compat
+          name: Trilha-Tecnologica-Android-Compat-Estavel
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/app-debug.apk.sha256
