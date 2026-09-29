@@ -82,7 +82,7 @@ html = html.replace(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/gi, func
   try {
     const result = babel.transformSync(code, {
       presets: [[presetEnv, {
-        targets: { chrome: '49' },
+        targets: { chrome: '40' },
         modules: false,
         bugfixes: true,
         useBuiltIns: false
