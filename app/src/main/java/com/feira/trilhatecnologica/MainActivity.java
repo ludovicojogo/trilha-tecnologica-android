@@ -15,8 +15,9 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
-import android.webkit.ConsoleMessage;\nimport android.webkit.WebChromeClient;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -58,8 +59,34 @@ public class MainActivity extends Activity {
         settings.setSupportZoom(false);
         settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
 
-        webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                view.evaluateJavascript(
+                        "(function(){return (typeof jogarDado==='function' && typeof atualizarInterface==='function') ? 'ok' : 'falha';})()",
+                        value -> {
+                            if (!"\"ok\"".equals(value)) {
+                                Toast.makeText(MainActivity.this,
+                                        "O motor do jogo não inicializou. Atualize o Android System WebView ou use esta versão de compatibilidade.",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+                );
+            }
+        });
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                android.util.Log.e(
+                        "TrilhaTecnologica",
+                        consoleMessage.message() + " @" + consoleMessage.lineNumber()
+                );
+                return true;
+            }
+        });
+
         webView.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
         webView.setBackgroundColor(0xFF050816);
         webView.setFocusable(true);
@@ -78,7 +105,9 @@ public class MainActivity extends Activity {
             WindowInsetsController controller = getWindow().getInsetsController();
             if (controller != null) {
                 controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
-                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                controller.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                );
             }
         } else {
             getWindow().getDecorView().setSystemUiVisibility(
@@ -117,12 +146,15 @@ public class MainActivity extends Activity {
             webView.evaluateJavascript(
                     "(function(){" +
                             "var r=document.getElementById('ranking-overlay');" +
-                            "if(r && !r.classList.contains('hidden')){ if(typeof fecharRanking==='function') fecharRanking(); return 'closed'; }" +
+                            "if(r && !r.classList.contains('hidden')){" +
+                            "if(typeof fecharRanking==='function') fecharRanking();" +
+                            "return 'closed';" +
+                            "}" +
                             "return 'none';" +
-                    "})()",
+                            "})()",
                     value -> {
-                        if (!"\"closed\"".equals(value)) {
-                            if (webView.canGoBack()) webView.goBack();
+                        if (!"\"closed\"".equals(value) && webView.canGoBack()) {
+                            webView.goBack();
                         }
                     }
             );
@@ -156,7 +188,7 @@ public class MainActivity extends Activity {
             try {
                 String safeName = (fileName == null || fileName.trim().isEmpty())
                         ? "ranking.csv"
-                        : fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+                        : fileName.replaceAll("[\\/:*?\"<>|]", "_");
 
                 byte[] bytes = content == null
                         ? new byte[0]
@@ -168,23 +200,33 @@ public class MainActivity extends Activity {
                     ContentValues values = new ContentValues();
                     values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
                     values.put(MediaStore.Downloads.MIME_TYPE, "text/csv");
-                    values.put(MediaStore.Downloads.RELATIVE_PATH,
-                            Environment.DIRECTORY_DOWNLOADS + "/TrilhaTecnologica");
+                    values.put(
+                            MediaStore.Downloads.RELATIVE_PATH,
+                            Environment.DIRECTORY_DOWNLOADS + "/TrilhaTecnologica"
+                    );
 
                     Uri uri = context.getContentResolver().insert(
-                            MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                            values
+                    );
 
-                    if (uri == null) throw new IllegalStateException("Não foi possível criar o arquivo.");
+                    if (uri == null) {
+                        throw new IllegalStateException("Não foi possível criar o arquivo.");
+                    }
 
                     try (OutputStream os = context.getContentResolver().openOutputStream(uri)) {
-                        if (os == null) throw new IllegalStateException("Não foi possível abrir o arquivo.");
+                        if (os == null) {
+                            throw new IllegalStateException("Não foi possível abrir o arquivo.");
+                        }
                         os.write(bytes);
                     }
 
                     message = "Ranking salvo em Downloads/TrilhaTecnologica/" + safeName;
                 } else {
                     File dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                    if (dir == null) throw new IllegalStateException("Armazenamento indisponível.");
+                    if (dir == null) {
+                        throw new IllegalStateException("Armazenamento indisponível.");
+                    }
                     if (!dir.exists()) dir.mkdirs();
 
                     File file = new File(dir, safeName);
@@ -196,9 +238,11 @@ public class MainActivity extends Activity {
 
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show();
             } catch (Exception e) {
-                Toast.makeText(context,
+                Toast.makeText(
+                        context,
                         "Não foi possível exportar o ranking: " + e.getMessage(),
-                        Toast.LENGTH_LONG).show();
+                        Toast.LENGTH_LONG
+                ).show();
             }
         }
     }
